@@ -1,0 +1,12 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python",
+            "request": "launch",
+            "type": "debugpy",
+            "program": "main.py",
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}
