@@ -125,12 +125,13 @@ def forca_paredes(p0:np.ndarray, p1:np.ndarray, points_plan:np.ndarray, velocity
     total_force = total_force * mask_point_faces[:, :, np.newaxis]
     total_force = np.nan_to_num(total_force, nan=0.0)
     
-    return total_force.mean(axis=0)
+    return np.sum(total_force[:], axis=1)
 
-def integrar_movimento_com_parede(posicao_t_1:np.ndarray, particulas:list[Particula], mesh:Trimesh, k_parede:float, damping:float, dt:float):
+def integrar_movimento_com_parede(posicao_t_1:np.ndarray, particulas:list[Particula], mesh:Trimesh, k_parede:float, damping:float, e:float, dt:float):
     faces = np.array(mesh.vertices[mesh.faces])
 
     for n, particula in enumerate(particulas):
+
         forca_parede = forca_paredes(
             np.array([posicao_t_1[n]]),
             np.array([particula.posicao]),
@@ -143,24 +144,30 @@ def integrar_movimento_com_parede(posicao_t_1:np.ndarray, particulas:list[Partic
         forca = forca_parede[0]
 
         aceleracao = (forca / particula.massa)
-        velocidade_final = 0.5 * aceleracao * dt
+        velocidade_final = aceleracao * dt
 
-        # Limitando a velocidade final a no máximo a velocidade inicial
-        if (np.abs(velocidade_final) > np.abs(particula.velocidade)).any():
-            velocidade_final = np.array([
-                np.sign(velocidade_final[0]) * np.minimum(np.abs(velocidade_final[0]), np.abs(particula.velocidade[0])),
-                np.sign(velocidade_final[1]) * np.minimum(np.abs(velocidade_final[1]), np.abs(particula.velocidade[1])),
-                np.sign(velocidade_final[2]) * np.minimum(np.abs(velocidade_final[2]), np.abs(particula.velocidade[2]))
-            ])
+        # Limitando a velocidade final a no máximo a 2*velocidade inicial
+        norm_reference = np.linalg.norm(velocidade_final)
+        if norm_reference > 0:
+            unit_reference = velocidade_final / norm_reference
+        else:
+            unit_reference = np.zeros_like(velocidade_final)
 
-            print(f"Velocidade: {velocidade_final[2]}m/s")
+        if np.linalg.norm(velocidade_final) > (2*np.linalg.norm(particula.velocidade)):
+            velocidade_final = unit_reference * 2 * np.linalg.norm(particula.velocidade)
 
         # Antes da forca das paredes
         # Atualizar posição usando o método de Verlet
-        nova_posicao = posicao_t_1[n] + particula.velocidade * dt + velocidade_final * dt
+        nova_posicao = posicao_t_1[n] + particula.velocidade * dt + 0.5 * velocidade_final * dt
         
         # Calcular nova velocidade
         nova_velocidade = particula.velocidade + velocidade_final
+
+        velocidade_restituida = unit_reference * e * np.linalg.norm(particula.velocidade)
+        sinais_opostos = ((velocidade_restituida * nova_velocidade) < 0).any()
+        new_velocity_not_compatible = np.linalg.norm(nova_velocidade) < np.linalg.norm(velocidade_restituida)
+        if np.linalg.norm(forca) != 0 and (sinais_opostos or new_velocity_not_compatible):
+            nova_velocidade = velocidade_restituida
         
         # Atualizar posição e velocidade da partícula
         particula.posicao = nova_posicao

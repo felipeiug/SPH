@@ -26,18 +26,19 @@ massa_total = 1.0  # Massa total das partículas [kg]
 raio_suavizacao = 0.1 # Raio de suavização para o kernel_poly6 para cálculo de densidade
 k = 1000  # Constante de rigidez do fluido
 mu = 1.002E-3 #coeficiente de viscosidade dinâmica (𝜇) [kg/(m·s)] ou 0.1??
-dt = 0.1 # Tempo entre cada passo em segundos
-tempo_max = 5 # tempo do fim da simulação
+dt = 0.005 # Tempo entre cada passo em segundos
+tempo_max = 15 # tempo do fim da simulação em segundos
 num_passos = int(tempo_max/dt)  # Número de passos de tempo
-k_parede = 1E24  # Constante de rigidez das paredes
-damping_parede = 0.0001  # Fator de amortecimento
+k_parede = 100000  # Constante de rigidez das paredes
+e_parede = 0.5 # Coeficiente de restituição da parede
+damping_parede = 0.001  # Fator de amortecimento
 aceleracao_gravidade = np.array([0, 0, -9.81])
 
 # Exemplo de pontos que formam um cubo
 vertices = np.array([
     [0, 0, 0],
     [1, 0, 0],
-    [1, 1, 2],
+    [1, 1, 0],
     [0, 1, 0],
     # [0, 0, 1],
     # [1, 0, 1],
@@ -67,12 +68,13 @@ mesh = trimesh.Trimesh(vertices=vertices, faces=faces)
 densidade_referencia = massa_total/mesh.volume  # Densidade de referência (por exemplo, densidade da água em kg/m^3)
 
 # Inicializar partículas
-particulas:list[Particula] = np.array([
-    Particula(posicao=[0.5, 0.5, 5], velocidade=[0., 0., 3.], massa=1, volume=1),
-])  #inicializar_particulas(mesh, num_particulas, massa_total)
+particulas:list[Particula] = np.array([])  #inicializar_particulas(mesh, num_particulas, massa_total)
 
 fig = plt.figure(figsize=(8, 6))
 ax = fig.add_subplot(111, projection='3d')
+
+global stop_simulation
+stop_simulation = False
 
 def loop_simulacao(
     particulas:list[Particula],
@@ -84,10 +86,15 @@ def loop_simulacao(
     num_passos:float,
     k_parede:float,
     damping_parede:float,
+    e_parede: float,
     aceleracao_gravidade:list[float],
 ):
+    global stop_simulation
     
     for passo in range(num_passos):
+        if stop_simulation:
+            break
+
         # print(f"Tempo em {passo * dt}s")
 
         # Atualizar densidade de cada partícula
@@ -118,7 +125,7 @@ def loop_simulacao(
                 raio_suavizacao,
                 mu
             )
-        
+
         # Integrar movimento de cada partícula
         integrar_movimento(particulas, dt)
         integrar_gravidade(particulas, aceleracao_gravidade, dt)
@@ -128,8 +135,12 @@ def loop_simulacao(
             mesh,
             k_parede,
             damping_parede,
+            e_parede,
             dt,
         )
+
+        if passo%int(np.power(10, (-np.log10(dt)-1))) != 0:
+            continue
 
         # Posição atual
         # print(particulas[0].posicao[2])
@@ -139,11 +150,14 @@ def loop_simulacao(
         ys = [i.posicao[1] for i in particulas]
         zs = [i.posicao[2] for i in particulas]
 
-        ax.set_xlim(mesh.vertices[:, 0].min()-0.1,mesh.vertices[:, 0].max()+0.1)
-        ax.set_ylim(mesh.vertices[:, 1].min()-0.1, mesh.vertices[:, 1].max()+0.1)
-        ax.set_zlim(0, 12)
+        ax.set_xlim(mesh.vertices[:, 0].min()-1,mesh.vertices[:, 0].max()+1)
+        ax.set_ylim(mesh.vertices[:, 1].min()-1, mesh.vertices[:, 1].max()+1)
+        ax.set_zlim(-7, 12)
 
-        ax.set_title(f"Tempo em {passo * dt}s")
+        str_title = f"Tempo em {(passo * dt):.4f}s"
+        str_title += f"\nPosição ({particulas[0].posicao[0]:.2f},{particulas[0].posicao[1]:.2f},{particulas[0].posicao[2]:.2f})"
+        str_title += f"\nVelocidade  ({particulas[0].velocidade[0]:.2f},{particulas[0].velocidade[1]:.2f},{particulas[0].velocidade[2]:.2f})"
+        ax.set_title(str_title)
         ax.grid(False)
 
         # Plotando a malha
@@ -174,7 +188,7 @@ def loop_simulacao(
 
         canvas.draw()
 
-        plt.savefig(f"frames/frame_{passo}.png")
+        # plt.savefig(f"frames/frame_{passo}.png")
 
 
 root = Tk()
@@ -206,7 +220,23 @@ frame_grafico = Frame(root)
 frame_grafico.pack(padx=10, pady=10)
 
 # Criação da figura do Matplotlib
-grafico = ax.scatter([1], [1], [1])
+ax.set_xlim(mesh.vertices[:, 0].min()-0.1,mesh.vertices[:, 0].max()+0.1)
+ax.set_ylim(mesh.vertices[:, 1].min()-0.1, mesh.vertices[:, 1].max()+0.1)
+ax.set_zlim(0, 12)
+ax.grid(False)
+
+# Plotando a malha
+ax.plot_trisurf(
+    mesh.vertices[:, 0],
+    mesh.vertices[:,1],
+    mesh.vertices[:,2],
+    triangles=mesh.faces,
+    ec='k',
+    color='black', edgecolor='black',
+    alpha=0.2,
+    zorder=1,
+    # facecolors=plt.cm.viridis(colors)
+)
 
 # Criação do canvas para o gráfico com Tkinter
 canvas = FigureCanvasTkAgg(fig, master=frame_grafico)
@@ -214,25 +244,50 @@ canvas.draw()
 canvas.get_tk_widget().pack()
 
 # Executar loop de simulação
-t = Thread(
-    target=loop_simulacao,
-    args=(
-        particulas,
-        raio_suavizacao,
-        k,
-        densidade_referencia,
-        mu,
-        dt,
-        num_passos,
-        k_parede,
-        damping_parede,
-        aceleracao_gravidade,
+global t
+t:Thread = None
+
+def startSimulation():
+    global stop_simulation
+    global t
+    stop_simulation = False
+
+    t = Thread(
+        target=loop_simulacao,
+        args=(
+            np.array([Particula(
+                posicao=[0.5, 0.7, 3],
+                velocidade=[0, 0, 3.],
+                massa=1,
+                volume=1
+            )]),
+            raio_suavizacao,
+            k,
+            densidade_referencia,
+            mu,
+            dt,
+            num_passos,
+            k_parede,
+            damping_parede,
+            e_parede,
+            aceleracao_gravidade,
+        )
     )
-)
+    t.start()
+
+def stopSimulation():
+    global t
+    global stop_simulation
+
+    stop_simulation = True
+
+    t.join()
 
 # Botão para atualizar o gráfico
-btn_atualizar = Button(root, text="Atualizar Gráfico", command=lambda x=None: t.start())
-btn_atualizar.pack(pady=10)
+frame_btns = Frame(root)
+frame_btns.pack()
+Button(frame_btns, text="Atualizar Gráfico", command=lambda x=None: startSimulation()).pack(pady=10)
+Button(frame_btns, text="Stop", command=lambda x=None: stopSimulation()).pack(pady=10)
 
 # loop_simulacao(particulas, raio_suavizacao, k, densidade_referencia, mu, dt, num_passos)
 
