@@ -1,13 +1,21 @@
 import numpy as np
 import trimesh
-import secrets
-import string
 
 class Particula:
-    def __init__(self, posicao:list[float], velocidade:list[float], massa:float, volume:float):
+    def __init__(self,
+            posicao:list[float],
+            velocidade:list[float],
+            restituition_coeficient:float,
+            friction_coeficient:float,
+            massa:float, volume:float,
+        ):
         self.posicao = np.array(posicao)
         self.velocidade = np.array(velocidade)
         self.massa = massa
+
+        # Coeficientes de colizão
+        self.restituition_coeficient = restituition_coeficient
+        self.friction_coeficient = friction_coeficient
 
         #TODO: Verificar se densidade pode ter um valor inicial ou se deve ser 0
         self.densidade = massa/volume

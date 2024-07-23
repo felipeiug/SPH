@@ -29,9 +29,8 @@ mu = 1.002E-3 #coeficiente de viscosidade dinâmica (𝜇) [kg/(m·s)] ou 0.1??
 dt = 0.005 # Tempo entre cada passo em segundos
 tempo_max = 15 # tempo do fim da simulação em segundos
 num_passos = int(tempo_max/dt)  # Número de passos de tempo
-k_parede = 100000  # Constante de rigidez das paredes
-e_parede = 0.5 # Coeficiente de restituição da parede
-damping_parede = 0.001  # Fator de amortecimento
+e_parede  = 0.5 # Coeficiente de restituição da parede
+mi_parede = 0.2 # Coeficiente de fricção     da parede
 aceleracao_gravidade = np.array([0, 0, -9.81])
 
 # Exemplo de pontos que formam um cubo
@@ -84,9 +83,8 @@ def loop_simulacao(
     mu:float,
     dt:float,
     num_passos:float,
-    k_parede:float,
-    damping_parede:float,
-    e_parede: float,
+    e_parede:float,
+    mi_parede:float,
     aceleracao_gravidade:list[float],
 ):
     global stop_simulation
@@ -133,9 +131,8 @@ def loop_simulacao(
             posicoes,
             particulas,
             mesh,
-            k_parede,
-            damping_parede,
             e_parede,
+            mi_parede,
             dt,
         )
 
@@ -257,7 +254,9 @@ def startSimulation():
         args=(
             np.array([Particula(
                 posicao=[0.5, 0.7, 3],
-                velocidade=[0, 0, 3.],
+                velocidade=[0, 0.01, 3.],
+                restituition_coeficient=0.9,
+                friction_coeficient=0.9,
                 massa=1,
                 volume=1
             )]),
@@ -267,9 +266,8 @@ def startSimulation():
             mu,
             dt,
             num_passos,
-            k_parede,
-            damping_parede,
             e_parede,
+            mi_parede,
             aceleracao_gravidade,
         )
     )

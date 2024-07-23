@@ -74,7 +74,15 @@ def distance_point_plan(points:np.ndarray, a:np.ndarray, b:np.ndarray, c:np.ndar
     return distancias.T
 
 
-def forca_paredes(p0:np.ndarray, p1:np.ndarray, points_plan:np.ndarray, velocity:np.ndarray, k:float, damping:float)->np.ndarray:
+def new_positions_and_velocities(
+        p0:np.ndarray, p1:np.ndarray,
+        velocity:np.ndarray,
+        e_particles:np.ndarray,
+        mi_particles:np.ndarray,
+        points_plan:np.ndarray,
+        e_plan:np.ndarray,
+        mi_plan:np.ndarray,
+    )->np.ndarray:
     if p0.shape != p1.shape:
         raise ValueError("P0 e P1 dever ter exatamente a mesma quantidade de pontos")
     if points_plan.shape[1] != points_plan.shape[2]:
@@ -96,7 +104,7 @@ def forca_paredes(p0:np.ndarray, p1:np.ndarray, points_plan:np.ndarray, velocity
     point_mask:np.ndarray = mask.any(axis=0) # Pontos que cruzam qualquer plano
 
     if not point_mask.any():
-        return np.zeros((p0.shape[0], 3))
+        return p1, velocity
 
     # Planos que são cruzados por algum ponto
     plans_mask = mask.any(axis=1)
@@ -110,84 +118,47 @@ def forca_paredes(p0:np.ndarray, p1:np.ndarray, points_plan:np.ndarray, velocity
     # Verificar se o ponto de interseção está dentro do triângulo
     mask_point_faces = points_in_faces(p_interseccao, plans)
     
-    # Calcular a força exercida pela parede no ponto
+    # Normais dos planos
     plane_normal = np.array([a, b, c]).T
     plane_normal = plane_normal / np.linalg.norm(plane_normal, axis=1)[:, np.newaxis]
 
-    penetration = np.sum((p_interseccao - p1[:, np.newaxis]) * plane_normal, axis=2)
+    # Velocidades finais
+    normal_velocity = np.sum(
+        np.linalg.norm(velocity, axis=1)[:, np.newaxis]*plane_normal,
+        axis=2
+    )*plane_normal
+    tangent_velocity = velocity - normal_velocity
 
-    normal_velocity = np.sum(velocity[:, np.newaxis]*plane_normal, axis=2)
+    effective_e = np.sqrt(e_particles * e_plan)
+    effective_friction = np.sqrt(mi_particles * mi_plan)
+    
+    valocity_final = (normal_velocity * effective_e) - (effective_friction * tangent_velocity)
 
-    elastic_force = k * penetration[:, :, np.newaxis] * plane_normal
-    damping_force = -damping * normal_velocity[:, :, np.newaxis] * plane_normal
-
-    total_force = elastic_force + damping_force
     total_force = total_force * mask_point_faces[:, :, np.newaxis]
     total_force = np.nan_to_num(total_force, nan=0.0)
     
     return np.sum(total_force[:], axis=1)
 
-def integrar_movimento_com_parede(posicao_t_1:np.ndarray, particulas:list[Particula], mesh:Trimesh, k_parede:float, damping:float, e:float, dt:float):
+def integrar_movimento_com_parede(posicao_t_1:np.ndarray, particulas:list[Particula], mesh:Trimesh, e:float, mi:float,  dt:float):
     faces = np.array(mesh.vertices[mesh.faces])
 
     for n, particula in enumerate(particulas):
 
-        forca_parede = forca_paredes(
-            np.array([posicao_t_1[n]]),
-            np.array([particula.posicao]),
-            faces,
-            np.array([particula.velocidade]),
-            k_parede,
-            damping,
+        final_position, final_velocity = new_positions_and_velocities(
+            p0 = np.array([posicao_t_1[n]]),
+            p1 = np.array([particula.posicao]),
+            velocity = np.array([particula.velocidade]),
+            e_particles = np.array([particula.restituition_coeficient]),
+            mi_particles = np.array([particula.friction_coeficient]),
+            points_plan = faces,
+            e_plan=np.full_like(e, faces.shape[0]),
+            mi_plan=np.full_like(mi, faces.shape[0]),
         )
-
-        forca = forca_parede[0]
-
-        aceleracao = (forca / particula.massa)
-        velocidade_final = aceleracao * dt
-
-        # Limitando a velocidade final a no máximo a 2*velocidade inicial
-        norm_reference = np.linalg.norm(velocidade_final)
-        if norm_reference > 0:
-            unit_reference = velocidade_final / norm_reference
-        else:
-            unit_reference = np.zeros_like(velocidade_final)
-
-        if np.linalg.norm(velocidade_final) > (2*np.linalg.norm(particula.velocidade)):
-            velocidade_final = unit_reference * 2 * np.linalg.norm(particula.velocidade)
-
-        # Antes da forca das paredes
-        # Atualizar posição usando o método de Verlet
-        nova_posicao = posicao_t_1[n] + particula.velocidade * dt + 0.5 * velocidade_final * dt
-        
-        # Calcular nova velocidade
-        nova_velocidade = particula.velocidade + velocidade_final
-
-        velocidade_restituida = unit_reference * e * np.linalg.norm(particula.velocidade)
-        sinais_opostos = ((velocidade_restituida * nova_velocidade) < 0).any()
-        new_velocity_not_compatible = np.linalg.norm(nova_velocidade) < np.linalg.norm(velocidade_restituida)
-        if np.linalg.norm(forca) != 0 and (sinais_opostos or new_velocity_not_compatible):
-            nova_velocidade = velocidade_restituida
         
         # Atualizar posição e velocidade da partícula
-        particula.posicao = nova_posicao
-        particula.velocidade = nova_velocidade
+        particula.posicao = final_position[0]
+        particula.velocidade = final_velocity[0]
 
 
 if __name__ == "__main__":
-    # Exemplo de uso
-    p0 = np.array([(1, 2, 1), (0,  3, 3)])  # Posição em t0
-    p1 = np.array([(3, 4, 3), (1, -4, 3)])  # Posição em t1
-    plano = np.array([
-        np.array([(0, 0, 0), (1, 1, 0), (1, 1, 1)]),
-        np.array([(1, 1, 1), (2, 1, 1), (0, 2, 0)]),
-        np.array([(1, 3, 7), (0, 2, 0), (4, 8, 10)]),
-        np.array([(6, 2, 5), (1, 4, 7), (6, 1.5, 0)]),
-    ])  # Plano
-    velocidade = np.array(p1 - p0)
-
-
-    k_parede = 1000  # Constante de rigidez das paredes
-    damping = 0.1  # Fator de amortecimento
-    forcas = forca_paredes(p0, p1, plano, velocidade, k_parede, damping)
-    print("Forças atuantes:\n", forcas)
+    pass
