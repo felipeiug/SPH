@@ -187,7 +187,7 @@ def loop_simulacao(
 
         canvas.draw()
 
-        plt.savefig(f"frames/frame_{passo}.png")
+        # plt.savefig(f"frames/frame_{passo}.png")
 
 
 root = Tk()
