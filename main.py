@@ -26,19 +26,19 @@ massa_total = 1.0  # Massa total das partículas [kg]
 raio_suavizacao = 0.1 # Raio de suavização para o kernel_poly6 para cálculo de densidade
 k = 1000  # Constante de rigidez do fluido
 mu = 1.002E-3 #coeficiente de viscosidade dinâmica (𝜇) [kg/(m·s)] ou 0.1??
-dt = 0.005 # Tempo entre cada passo em segundos
+dt = 0.00005 # Tempo entre cada passo em segundos
 tempo_max = 15 # tempo do fim da simulação em segundos
 num_passos = int(tempo_max/dt)  # Número de passos de tempo
 e_parede  = 0.5 # Coeficiente de restituição da parede
-mi_parede = 0.2 # Coeficiente de fricção     da parede
+mi_parede = 0.002 # Coeficiente de fricção da parede
 aceleracao_gravidade = np.array([0, 0, -9.81])
 
 # Exemplo de pontos que formam um cubo
 vertices = np.array([
-    [0, 0, 0],
-    [1, 0, 0],
-    [1, 1, 0],
-    [0, 1, 0],
+    [-10, -10, 0],
+    [10, -10, 2],
+    [10, 10, 0],
+    [-10, 10, 0],
     # [0, 0, 1],
     # [1, 0, 1],
     # [1, 1, 1],
@@ -95,8 +95,10 @@ def loop_simulacao(
 
         # print(f"Tempo em {passo * dt}s")
 
-        # Atualizar densidade de cada partícula
+        # Posções em t(n-1)
         posicoes = np.array([part.posicao for part in particulas])
+
+        # Atualizar densidade de cada partícula
         massas = np.array([part.massa for part in particulas])
         for n, particula in enumerate(particulas):
             particula.densidade = calcular_densidade(particula, posicoes, massas, raio_suavizacao)
@@ -136,7 +138,7 @@ def loop_simulacao(
             dt,
         )
 
-        if passo%int(np.power(10, (-np.log10(dt)-1))) != 0:
+        if passo%np.ceil(np.power(10, (-np.log10(dt)-1))) != 0:
             continue
 
         # Posição atual
@@ -185,7 +187,7 @@ def loop_simulacao(
 
         canvas.draw()
 
-        # plt.savefig(f"frames/frame_{passo}.png")
+        plt.savefig(f"frames/frame_{passo}.png")
 
 
 root = Tk()
@@ -220,6 +222,11 @@ frame_grafico.pack(padx=10, pady=10)
 ax.set_xlim(mesh.vertices[:, 0].min()-0.1,mesh.vertices[:, 0].max()+0.1)
 ax.set_ylim(mesh.vertices[:, 1].min()-0.1, mesh.vertices[:, 1].max()+0.1)
 ax.set_zlim(0, 12)
+
+ax.set_xlabel("x")
+ax.set_ylabel("y")
+ax.set_zlabel("z")
+
 ax.grid(False)
 
 # Plotando a malha
@@ -253,7 +260,7 @@ def startSimulation():
         target=loop_simulacao,
         args=(
             np.array([Particula(
-                posicao=[0.5, 0.7, 3],
+                posicao=[2, -2, 3],
                 velocidade=[0, 0.01, 3.],
                 restituition_coeficient=0.9,
                 friction_coeficient=0.9,

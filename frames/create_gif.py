@@ -15,7 +15,7 @@ def create_gif(image_list:list[str], gif_name):
             frames.append(imageio.imread(f"frames/{image_name}"))
     
     # Salva como GIF usando imageio
-    imageio.mimsave(gif_name, frames, duration=0.1)  # Ajuste a duração conforme necessário
+    imageio.mimsave(gif_name, frames, duration=0.005)  # Ajuste a duração conforme necessário
 
 create_gif(image_list, gif_name)
 
