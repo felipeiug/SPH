@@ -26,17 +26,17 @@ massa_total = 1.0  # Massa total das partículas [kg]
 raio_suavizacao = 0.1 # Raio de suavização para o kernel_poly6 para cálculo de densidade
 k = 1000  # Constante de rigidez do fluido
 mu = 1.002E-3 #coeficiente de viscosidade dinâmica (𝜇) [kg/(m·s)] ou 0.1??
-dt = 0.00005 # Tempo entre cada passo em segundos
+dt = 0.005 # Tempo entre cada passo em segundos
 tempo_max = 15 # tempo do fim da simulação em segundos
 num_passos = int(tempo_max/dt)  # Número de passos de tempo
-e_parede  = 0.5 # Coeficiente de restituição da parede
+e_parede  = 0.2 # Coeficiente de restituição da parede
 mi_parede = 0.002 # Coeficiente de fricção da parede
 aceleracao_gravidade = np.array([0, 0, -9.81])
 
 # Exemplo de pontos que formam um cubo
 vertices = np.array([
     [-10, -10, 0],
-    [10, -10, 2],
+    [10, -10, 7],
     [10, 10, 0],
     [-10, 10, 0],
     # [0, 0, 1],
@@ -92,10 +92,7 @@ def loop_simulacao(
     for passo in range(num_passos):
         if stop_simulation:
             break
-
-        # print(f"Tempo em {passo * dt}s")
-
-        # Posções em t(n-1)
+        
         posicoes = np.array([part.posicao for part in particulas])
 
         # Atualizar densidade de cada partícula
@@ -187,7 +184,7 @@ def loop_simulacao(
 
         canvas.draw()
 
-        # plt.savefig(f"frames/frame_{passo}.png")
+        plt.savefig(f"frames/frame_{passo}.png")
 
 
 root = Tk()

@@ -1,6 +1,7 @@
 import numpy as np
 from trimesh import Trimesh
 from functions.a_inicializar_particulas import Particula
+from config.config import Configs
 
 def plan_by_points(points_plan:np.ndarray):
     if points_plan.shape[1] != points_plan.shape[2]:
@@ -131,9 +132,6 @@ def new_positions_and_velocities(
         D0 = (a*p0[0] + b*p0[1] + c*p0[2] + d)
         D1 = (a*p1[0] + b*p1[1] + c*p1[2] + d)
 
-        D0 = np.round(D0, 22)
-        D1 = np.round(D1, 22)
-
         m1 = np.where((D0>=0), 1, -1)
         m2 = np.where((D1>=0), 1, -1)
         mask = (m1*m2) < 0
@@ -185,6 +183,11 @@ def new_positions_and_velocities(
             friction_velocity = (effective_friction*tangent_velocity)
             e_velocity = (effective_e*normal_velocity)
             velocity_final = e_velocity - friction_velocity
+
+            mask_velocity_0 = (np.abs(velocity_final) < Configs.velocity_like_0)
+            if mask_velocity_0.any():
+                multi = np.where(mask_velocity_0, 0, 1)
+                velocity_final = multi * velocity_final
             
             # Caso a velocidade tenha zerado
             norm_velocity_final = np.linalg.norm(velocity_final)
@@ -204,6 +207,9 @@ def new_positions_and_velocities(
 
             p0 = p_intersec
             p1 = p_intersec + dir_velocidade*distance_p0_p1
+
+            if p1[1] < p0[1] or p1[2] < p0[2]:
+                print("AAA")
 
             velocity = velocity_final
 
