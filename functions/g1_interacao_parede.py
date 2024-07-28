@@ -113,6 +113,7 @@ def new_positions_and_velocities(
         mi_plan:np.ndarray,
         dt:float,
     )->np.ndarray:
+    p_inicial = p0
     p1 = particle.posicao
     velocity = particle.velocidade
     e_particle = particle.restituition_coeficient
@@ -127,16 +128,25 @@ def new_positions_and_velocities(
 
     distance_p0_p1 = np.linalg.norm(p1-p0)
     
-    while distance_p0_p1 > 0:
-        # Calcular os denominadores
-        D0 = (a*p0[0] + b*p0[1] + c*p0[2] + d)
+    while True:
+        # Verificar se ainda cruza a parede
+        D0 = (a*p_inicial[0] + b*p_inicial[1] + c*p_inicial[2] + d)
         D1 = (a*p1[0] + b*p1[1] + c*p1[2] + d)
 
         m1 = np.where((D0>=0), 1, -1)
         m2 = np.where((D1>=0), 1, -1)
         mask = (m1*m2) < 0
 
-        if not mask.any():
+        if mask.any():
+            p0 = p_inicial
+
+        else:
+            # Calcular os novos denominadores
+            D0 = (a*p0[0] + b*p0[1] + c*p0[2] + d)
+            m1 = np.where((D0>=0), 1, -1)
+            mask = (m1*m2) < 0
+
+        if distance_p0_p1 < 0 and not mask.any():
             return p1, velocity
         
         # Ponto de interseção
@@ -208,12 +218,7 @@ def new_positions_and_velocities(
             p0 = p_intersec
             p1 = p_intersec + dir_velocidade*distance_p0_p1
 
-            if p1[1] < p0[1] or p1[2] < p0[2]:
-                print("AAA")
-
             velocity = velocity_final
-
-    return p1, velocity
     
     
 def integrar_movimento_com_parede(posicao_t_1:np.ndarray, particulas:list[Particula], mesh:Trimesh, e:float, mi:float,  dt:float):

@@ -18,7 +18,7 @@ from functions.h_integralizar_gravidade import integrar_gravidade
 
 from layout.screen_position import start_screen_position, on_close_window_save_screen_position
 
-# from frames.create_gif import *
+#from frames.create_gif import *
 
 # Definições de parâmetros
 num_particulas = 100
@@ -29,8 +29,8 @@ mu = 1.002E-3 #coeficiente de viscosidade dinâmica (𝜇) [kg/(m·s)] ou 0.1??
 dt = 0.005 # Tempo entre cada passo em segundos
 tempo_max = 15 # tempo do fim da simulação em segundos
 num_passos = int(tempo_max/dt)  # Número de passos de tempo
-e_parede  = 0.2 # Coeficiente de restituição da parede
-mi_parede = 0.002 # Coeficiente de fricção da parede
+e_parede  = 0.8 # Coeficiente de restituição da parede
+mi_parede = 0.02 # Coeficiente de fricção da parede
 aceleracao_gravidade = np.array([0, 0, -9.81])
 
 # Exemplo de pontos que formam um cubo
@@ -218,7 +218,7 @@ frame_grafico.pack(padx=10, pady=10)
 # Criação da figura do Matplotlib
 ax.set_xlim(mesh.vertices[:, 0].min()-0.1,mesh.vertices[:, 0].max()+0.1)
 ax.set_ylim(mesh.vertices[:, 1].min()-0.1, mesh.vertices[:, 1].max()+0.1)
-ax.set_zlim(0, 12)
+ax.set_zlim(-7, 12)
 
 ax.set_xlabel("x")
 ax.set_ylabel("y")
