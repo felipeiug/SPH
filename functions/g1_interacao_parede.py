@@ -127,6 +127,9 @@ def new_positions_and_velocities(
     a, b, c, d = plan_by_points(points_plan)
 
     distance_p0_p1 = np.linalg.norm(p1-p0)
+
+    if np.linalg.norm(velocity) > 10:
+        print("AAA")
     
     while True:
         # Verificar se ainda cruza a parede
@@ -146,7 +149,7 @@ def new_positions_and_velocities(
             m1 = np.where((D0>=0), 1, -1)
             mask = (m1*m2) < 0
 
-        if distance_p0_p1 < 0 and not mask.any():
+        if (distance_p0_p1 < 0 and not mask.any()) or np.linalg.norm(velocity) == 0:
             return p1, velocity
         
         # Ponto de interseção
@@ -166,8 +169,7 @@ def new_positions_and_velocities(
             return p1, velocity
 
         # Planos que são cruzados por algum ponto
-        ordem = np.argsort(np.abs(D0))
-        indices = np.arange(D0.size)[ordem]
+        indices = np.argsort(np.abs(D0))
 
         for indice in indices:
             if not mask[indice]:
@@ -199,6 +201,12 @@ def new_positions_and_velocities(
                 multi = np.where(mask_velocity_0, 0, 1)
                 velocity_final = multi * velocity_final
             
+            # Distância percorrida até a colizão
+            distance = np.linalg.norm(p_intersec - p0)
+
+            # Distancia restante
+            distance_p0_p1 = (distance_p0_p1 - distance)*(effective_e)
+            
             # Caso a velocidade tenha zerado
             norm_velocity_final = np.linalg.norm(velocity_final)
             if norm_velocity_final == 0:
@@ -206,12 +214,6 @@ def new_positions_and_velocities(
                 p1 = p_intersec
                 velocity = velocity_final
                 continue
-            
-            # Distância percorrida até a colizão
-            distance = np.linalg.norm(p_intersec - p0)
-
-            # Distancia restante
-            distance_p0_p1 = (distance_p0_p1 - distance)*(effective_e)
 
             dir_velocidade = velocity_final / norm_velocity_final
 

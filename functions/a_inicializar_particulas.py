@@ -5,17 +5,11 @@ class Particula:
     def __init__(self,
             posicao:list[float],
             velocidade:list[float],
-            restituition_coeficient:float,
-            friction_coeficient:float,
             massa:float, volume:float,
         ):
         self.posicao = np.array(posicao)
         self.velocidade = np.array(velocidade)
         self.massa = massa
-
-        # Coeficientes de colizão
-        self.restituition_coeficient = restituition_coeficient
-        self.friction_coeficient = friction_coeficient
 
         #TODO: Verificar se densidade pode ter um valor inicial ou se deve ser 0
         self.densidade = massa/volume
@@ -27,7 +21,7 @@ def inicializar_particulas(
         mesh:trimesh.Trimesh,
         num_particulas:int,
         massa_total:float = None,
-        massa_particula:float = None
+        massa_particula:float = None,
     )-> np.ndarray[Particula]:
 
     if massa_particula is None and massa_total is None:
@@ -75,7 +69,12 @@ def inicializar_particulas(
     for position in positions:
         velocidade = np.zeros(3)
 
-        particula = Particula(position, velocidade, massa_particula, volume_particula)
+        particula = Particula(
+            posicao=position,
+            velocidade=velocidade,
+            massa=massa_particula,
+            volume=volume_particula
+        )
         particulas = np.append(particulas, [particula])
 
 

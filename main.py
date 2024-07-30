@@ -15,6 +15,7 @@ from functions.d_calcular_forca import calcular_forca
 from functions.e_integrar_movimento import integrar_movimento
 from functions.g1_interacao_parede import integrar_movimento_com_parede
 from functions.h_integralizar_gravidade import integrar_gravidade
+from objetos.paredes import Parede
 
 from layout.screen_position import start_screen_position, on_close_window_save_screen_position
 
@@ -22,52 +23,59 @@ from layout.screen_position import start_screen_position, on_close_window_save_s
 
 # Definições de parâmetros
 num_particulas = 100
-massa_total = 1.0  # Massa total das partículas [kg]
+massa_total = 10.0  # Massa total das partículas [kg]
 raio_suavizacao = 0.1 # Raio de suavização para o kernel_poly6 para cálculo de densidade
 k = 1000  # Constante de rigidez do fluido
 mu = 1.002E-3 #coeficiente de viscosidade dinâmica (𝜇) [kg/(m·s)] ou 0.1??
-dt = 0.005 # Tempo entre cada passo em segundos
+dt = 0.0005 # Tempo entre cada passo em segundos
 tempo_max = 15 # tempo do fim da simulação em segundos
 num_passos = int(tempo_max/dt)  # Número de passos de tempo
-e_parede  = 0.8 # Coeficiente de restituição da parede
-mi_parede = 0.02 # Coeficiente de fricção da parede
+k_parede  = 10000000 # Constante de rigidez da parede.
+damping = 0.5 # Fator de amortecimento para a velocidade da partícula.
 aceleracao_gravidade = np.array([0, 0, -9.81])
 
 # Exemplo de pontos que formam um cubo
 vertices = np.array([
-    [-10, -10, 0],
-    [10, -10, 7],
-    [10, 10, 0],
-    [-10, 10, 0],
-    # [0, 0, 1],
-    # [1, 0, 1],
-    # [1, 1, 1],
-    # [0, 1, 1]
+    [0, 0, 0],
+    [1, 0, 0],
+    [1, 1, 0],
+    [0, 1, 0],
+    [0, 0, 1],
+    [1, 0, 1],
+    [1, 1, 1],
+    [0, 1, 1]
 ])
 
 # Definindo as faces do cubo
 faces = np.array([
     [0, 1, 2],
     [0, 2, 3],
-    # [4, 5, 6],
-    # [4, 6, 7],
-    # [0, 1, 5],
-    # [0, 5, 4],
-    # [2, 3, 7],
-    # [2, 7, 6],
-    # [1, 2, 6],
-    # [1, 6, 5],
+    [4, 5, 6],
+    [4, 6, 7],
+    [0, 1, 5],
+    [0, 5, 4],
+    [2, 3, 7],
+    [2, 7, 6],
+    [1, 2, 6],
+    [1, 6, 5],
     # [0, 3, 7],
     # [0, 7, 4]
 ])
 
 # Cria a malha
-mesh = trimesh.Trimesh(vertices=vertices, faces=faces)
+parede = Parede(k_parede=k_parede, damping=damping, vertices=vertices, faces=faces)
 
-densidade_referencia = massa_total/mesh.volume  # Densidade de referência (por exemplo, densidade da água em kg/m^3)
 
 # Inicializar partículas
-particulas:list[Particula] = np.array([])  #inicializar_particulas(mesh, num_particulas, massa_total)
+faces = np.append(faces, [
+    [0, 3, 7],
+    [0, 7, 4],
+], axis=0)
+mesh_closed = trimesh.Trimesh(vertices=vertices, faces=faces)
+
+densidade_referencia = massa_total/mesh_closed.volume  # Densidade de referência (por exemplo, densidade da água em kg/m^3)
+
+particulas:list[Particula] = inicializar_particulas(mesh_closed, num_particulas, massa_total)
 
 fig = plt.figure(figsize=(8, 6))
 ax = fig.add_subplot(111, projection='3d')
@@ -83,8 +91,6 @@ def loop_simulacao(
     mu:float,
     dt:float,
     num_passos:float,
-    e_parede:float,
-    mi_parede:float,
     aceleracao_gravidade:list[float],
 ):
     global stop_simulation
@@ -126,16 +132,16 @@ def loop_simulacao(
         # Integrar movimento de cada partícula
         integrar_movimento(particulas, dt)
         integrar_gravidade(particulas, aceleracao_gravidade, dt)
-        integrar_movimento_com_parede(
-            posicoes,
-            particulas,
-            mesh,
-            e_parede,
-            mi_parede,
-            dt,
-        )
 
-        if passo%np.ceil(np.power(10, (-np.log10(dt)-1))) != 0:
+        # Interação com a parede
+        for n, particula in enumerate(particulas):
+            particula.forca = parede.forca_parede_particula(
+                posicoes[n],
+                particula,
+            )
+        integrar_movimento(particulas, dt)
+
+        if passo%10 != 0:
             continue
 
         # Posição atual
@@ -146,9 +152,9 @@ def loop_simulacao(
         ys = [i.posicao[1] for i in particulas]
         zs = [i.posicao[2] for i in particulas]
 
-        ax.set_xlim(mesh.vertices[:, 0].min()-1,mesh.vertices[:, 0].max()+1)
-        ax.set_ylim(mesh.vertices[:, 1].min()-1, mesh.vertices[:, 1].max()+1)
-        ax.set_zlim(-7, 12)
+        ax.set_xlim(parede.vertices[:, 0].min()-0.5, parede.vertices[:, 0].max()+0.5)
+        ax.set_ylim(parede.vertices[:, 1].min()-0.5, parede.vertices[:, 1].max()+0.5)
+        ax.set_zlim(parede.vertices[:, 2].min()-0.5, parede.vertices[:, 2].max()+0.5)
 
         str_title = f"Tempo em {(passo * dt):.4f}s"
         str_title += f"\nPosição ({particulas[0].posicao[0]:.2f},{particulas[0].posicao[1]:.2f},{particulas[0].posicao[2]:.2f})"
@@ -158,10 +164,10 @@ def loop_simulacao(
 
         # Plotando a malha
         ax.plot_trisurf(
-            mesh.vertices[:, 0],
-            mesh.vertices[:,1],
-            mesh.vertices[:,2],
-            triangles=mesh.faces,
+            parede.vertices[:, 0],
+            parede.vertices[:,1],
+            parede.vertices[:,2],
+            triangles=parede.faces,
             ec='k',
             color='black', edgecolor='black',
             alpha=0.2,
@@ -216,9 +222,9 @@ frame_grafico = Frame(root)
 frame_grafico.pack(padx=10, pady=10)
 
 # Criação da figura do Matplotlib
-ax.set_xlim(mesh.vertices[:, 0].min()-0.1,mesh.vertices[:, 0].max()+0.1)
-ax.set_ylim(mesh.vertices[:, 1].min()-0.1, mesh.vertices[:, 1].max()+0.1)
-ax.set_zlim(-7, 12)
+ax.set_xlim(parede.vertices[:, 0].min()-0.5, parede.vertices[:, 0].max()+0.5)
+ax.set_ylim(parede.vertices[:, 1].min()-0.5, parede.vertices[:, 1].max()+0.5)
+ax.set_zlim(parede.vertices[:, 2].min()-0.5, parede.vertices[:, 2].max()+0.5)
 
 ax.set_xlabel("x")
 ax.set_ylabel("y")
@@ -228,15 +234,33 @@ ax.grid(False)
 
 # Plotando a malha
 ax.plot_trisurf(
-    mesh.vertices[:, 0],
-    mesh.vertices[:,1],
-    mesh.vertices[:,2],
-    triangles=mesh.faces,
+    parede.vertices[:, 0],
+    parede.vertices[:,1],
+    parede.vertices[:,2],
+    triangles=parede.faces,
     ec='k',
     color='black', edgecolor='black',
     alpha=0.2,
     zorder=1,
     # facecolors=plt.cm.viridis(colors)
+)
+
+# Plotando as partículas
+xs = [i.posicao[0] for i in particulas]
+ys = [i.posicao[1] for i in particulas]
+zs = [i.posicao[2] for i in particulas]
+
+# Plotando os pontos
+ax.scatter(
+    xs,
+    ys,
+    zs,
+    s=50,
+    cmap='viridis',
+    zorder=10
+    # s=tamanhos,
+    # c=cores,
+    # alpha=0.5
 )
 
 # Criação do canvas para o gráfico com Tkinter
@@ -256,22 +280,13 @@ def startSimulation():
     t = Thread(
         target=loop_simulacao,
         args=(
-            np.array([Particula(
-                posicao=[2, -2, 3],
-                velocidade=[0, 0.01, 3.],
-                restituition_coeficient=0.9,
-                friction_coeficient=0.9,
-                massa=1,
-                volume=1
-            )]),
+            particulas,
             raio_suavizacao,
             k,
             densidade_referencia,
             mu,
             dt,
             num_passos,
-            e_parede,
-            mi_parede,
             aceleracao_gravidade,
         )
     )
@@ -282,8 +297,8 @@ def stopSimulation():
     global stop_simulation
 
     stop_simulation = True
-
-    t.join()
+    time.sleep(2)
+    t = None
 
 # Botão para atualizar o gráfico
 frame_btns = Frame(root)
